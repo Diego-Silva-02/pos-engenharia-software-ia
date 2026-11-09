@@ -1,0 +1,43 @@
+# Dependências (inclui o tensorflow.dll de ~200 MB e o binding nativo)
+node_modules/
+
+# Variáveis de ambiente / segredos
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Cache de ferramentas
+.npm/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/install-state.gz
+.eslintcache
+
+# Modelos treinados salvos localmente (caso passe a usar model.save)
+saved-model/
+*.h5
+*.pb
+
+# Saídas de build e cobertura
+dist/
+build/
+coverage/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
