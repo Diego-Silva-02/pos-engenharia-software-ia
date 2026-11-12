@@ -2,6 +2,7 @@ import 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js';
 import { workerEvents } from '../events/constants.js';
 
 let _globalCtx = {};
+let _model = {};
 const WEIGHTS = {
     category: 0.4,
     color: 0.3,
@@ -138,7 +139,9 @@ function createTrainingData(context) {
     const labels = [];
 
     // Para cada usuário, vamos criar um vetor de entrada que é a concatenação do vetor do usuário com o vetor do produto
-    context.users.forEach(user => {
+    context.users
+    .filter(user => user.purchases.length) // filtra apenas usuários que compraram produtos (temporário)
+    .forEach(user => {
         const userVector = encodeUser(user, context).dataSync();
         context.products.forEach(product => {
             const productVector = encodeProduct(product, context)
@@ -164,6 +167,67 @@ function createTrainingData(context) {
     }
 }
 
+async function configureNeutralNetAndTrain(trainData) {
+    // Criando o modelo de rede neural
+    // O modelo é sequencial, ou seja, cada camada é conectada à próxima
+    const model = tf.sequential();
+
+    // Nesta primeira camada ele usa esses dados para entender os padrões e retornar os valores
+    model.add(
+        tf.layers.dense({
+            inputShape: [trainData.inputDimensions], // tamanho do vetor de entrada
+            units: 128, // número de neurônios na camada oculta
+            activation: 'relu' // função de ativação, mantem apenas valores positivos, ajuda a rede a aprender padrões não lineares
+        })
+    )
+
+    // Aqui ele trabalha com os dados que ele recebeu da primeira camada, e vai aprendendo padrões mais complexos
+    model.add(
+        tf.layers.dense({
+            units: 64, // número de neurônios na camada oculta
+            activation: 'relu' // função de ativação, mantem apenas valores positivos, ajuda a rede a aprender padrões não lineares
+        })
+    )
+
+    // Aqui ele continua comprimindo os dados (destilando as informações mais importantes) e vai treinar com menos neurônios
+    model.add(
+        tf.layers.dense({
+            units: 32, // número de neurônios na camada oculta
+            activation: 'relu' // função de ativação, mantem apenas valores positivos, ajuda a rede a aprender padrões não lineares
+        })
+    )
+
+    // camada de saída, que vai retornar a probabilidade de o usuário comprar o produto (0 ou 1)
+    model.add(
+        tf.layers.dense({
+            units: 1, // número de neurônios na camada de saída (apenas para retornar sim ou não, possibilidade de comprar ou não)
+            activation: 'sigmoid' // função de ativação, retorna valores entre 0 e 1 (ordenador), que é a probabilidade de o usuário comprar o produto
+        })
+    )
+
+    model.compile({
+        optimizer: tf.train.adam(0.01), // algoritmo de otimização, que vai ajustar os pesos da rede neural para minimizar o erro
+        loss: 'binaryCrossentropy', // função de perda, que vai medir o erro da rede neural (quanto mais próximo de 0, melhor)
+        metrics: ['accuracy'] // métrica de avaliação, que vai medir a acurácia da rede neural (quanto mais próximo de 1, melhor)
+    })
+
+    await model.fit(trainData.xs, trainData.ys, {
+        epochs: 100, // número de vezes que o modelo vai passar pelos dados de treinamento
+        batchSize: 32, // número de amostras que o modelo vai usar para atualizar os pesos da rede neural
+        shuffle: true, // embaralhar os dados de treinamento para evitar overfitting
+        callbacks: { // função que vai ser chamada a cada época de treinamento
+            onEpochEnd: (epoch, logs) => {
+                postMessage({ // enviando mensagem para o thread principal com o progresso do treinamento
+                    type: workerEvents.trainingLog,
+                    epoch: epoch,
+                    loss: logs.loss,
+                    accuracy: logs.acc
+                });
+            }}
+    })
+
+}
+
 async function trainModel({ users }) {
     console.log('Training model with users:', users)
     postMessage({ type: workerEvents.progressUpdate, progress: { progress: 50 } });
@@ -183,20 +247,10 @@ async function trainModel({ users }) {
     _globalCtx = context;
 
     const trainData = createTrainingData(context);
+    _model = await configureNeutralNetAndTrain(trainData);
 
-    postMessage({
-        type: workerEvents.trainingLog,
-        epoch: 1,
-        loss: 1,
-        accuracy: 1
-    });
-
-    setTimeout(() => {
-        postMessage({ type: workerEvents.progressUpdate, progress: { progress: 100 } });
-        postMessage({ type: workerEvents.trainingComplete });
-    }, 1000);
-
-
+    postMessage({ type: workerEvents.progressUpdate, progress: { progress: 100 } });
+    postMessage({ type: workerEvents.trainingComplete });
 }
 function recommend(user, ctx) {
     console.log('will recommend for user:', user)
