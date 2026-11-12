@@ -2,7 +2,7 @@ import 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js';
 import { workerEvents } from '../events/constants.js';
 
 let _globalCtx = {};
-let _model = {};
+let _model = null;
 const WEIGHTS = {
     category: 0.4,
     color: 0.3,
@@ -131,6 +131,19 @@ function encodeUser(user, context) {
             context.dimentions
         ]);
     }
+
+    // Se o usuário não comprou produtos, então vamos retornar um vetor
+    return tf.concat1d(
+        [
+            tf.zeros([1]), // preço é ignorado (afinal ele não comprou nada)
+            tf.tensor1d([
+                // normalizando a idade para mostrar a recomendação de quem tem a idade mais próxima dele
+                normalize(user.age, context.minAge, context.maxAge) * WEIGHTS.age
+            ]),
+            tf.zeros([context.numCategories]), // categoria ignorada
+            tf.zeros([context.numColors]), // cor ignorada
+        ]
+    ).reshape([1, context.dimentions]);
 }
 
 // Função para criar os dados de treinamento a partir do contexto
@@ -226,6 +239,7 @@ async function configureNeutralNetAndTrain(trainData) {
             }}
     })
 
+    return model;
 }
 
 async function trainModel({ users }) {
@@ -253,12 +267,58 @@ async function trainModel({ users }) {
     postMessage({ type: workerEvents.trainingComplete });
 }
 function recommend(user, ctx) {
-    console.log('will recommend for user:', user)
-    // postMessage({
-    //     type: workerEvents.recommend,
-    //     user,
-    //     recommendations: []
-    // });
+    if (!_model) return;
+    const context = _globalCtx;
+    // Converte o usuário fornecido no vetor de features codificadas
+    // (preço ignorado, idade normalizada, categorias e cores ignoradas para quem não possui compras)
+    // Isso transforma as informações do usuário no mesmo formato numérico que foi usado para treinar o modelo
+    const userVectors = encodeUser(user, context).dataSync();
+
+    // Em aplicações reais:
+    // Armazene todos os vetores de produtos em um bando de dados vetorial (como Postgres, Neo4j ou Pinecone)
+    // Consulta: Encontre os 200 produtos mais próximos do vetor do usuário
+    // Execute _model.predict() apenas nestes produtos
+
+    // Criando pares de entrada: para cada produto, concatenando vetor do usuário, com vetor codificado do produto.
+    // Assim o modelo prevê o "score de compatibilidade para cada par (usuário, produto)"
+
+    // Ou seja: Aqui está sendo comparando o vetor do usuário com o vetor de todos os produtos para calcular a probabilidade de o usuário comprar qualquer produto
+    const inputs = context.productVectors.map(({vector}) => {
+        return [ ...userVectors, ...vector ]
+    })
+    
+    // Fazendo a previsão
+    // Convertendo todos esses pares (usuário, produto) em um único Tensor
+    // Formato: [numProdutos, inputDim]
+    const inputTensor = tf.tensor2d(inputs);
+
+    // Rodando a rede neural treinada em todos os pares (usuário, produto) de uma vez.
+    // O resultado é uma pontuação para cada produto entre 0 e 1.
+    // Quanto maior o valor, maior a probabilidade do usuário querer aquele produto.
+    const predictions = _model.predict(inputTensor);
+
+    // Extrai as pontuações para um array JS normal.
+    const scores = predictions.dataSync();
+
+    const recommendations = context.productVectors.map((item, index) => {
+        return {
+            ...item.meta, // onde estão os dados do próprio produto
+            name: item.name,
+            score: scores[index] // previsão do modelo para este produto
+        }
+    });
+
+    // Apenas ordenando pelo score
+    const sortedItems = recommendations
+        .sort((a, b) => b.score - a.score);
+
+    // console.log('will recommend for user:', user)
+    // Envia a lista ordenada de produtos recomendados para a thread principal (a UI pode exibi-los agora).
+    postMessage({
+        type: workerEvents.recommend,
+        user,
+        recommendations: sortedItems
+    });
 }
 
 
