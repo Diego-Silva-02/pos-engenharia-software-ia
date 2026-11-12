@@ -266,9 +266,8 @@ async function trainModel({ users }) {
     postMessage({ type: workerEvents.progressUpdate, progress: { progress: 100 } });
     postMessage({ type: workerEvents.trainingComplete });
 }
-function recommend(user, ctx) {
+function recommend(user, context) {
     if (!_model) return;
-    const context = _globalCtx;
     // Converte o usuário fornecido no vetor de features codificadas
     // (preço ignorado, idade normalizada, categorias e cores ignoradas para quem não possui compras)
     // Isso transforma as informações do usuário no mesmo formato numérico que foi usado para treinar o modelo
