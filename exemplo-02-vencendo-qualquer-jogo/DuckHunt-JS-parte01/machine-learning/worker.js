@@ -2,23 +2,26 @@ importScripts('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest');
 
 const MODEL_PATH = `yolov5n_web_model/model.json`;
 const LABELS_PATH = `yolov5n_web_model/labels.json`;
-const INPUT_MODEL_DIMENTIONS = 640
+const INPUT_MODEL_DIMENTIONS = 640; // formato em que o modelo trabalha
 
-let _labels = []
-let _model = null
+let _labels = [];
+let _model = null;
 async function loadModelAndLabels() {
-    await tf.ready()
+    await tf.ready();
 
-    _labels = await (await fetch(LABELS_PATH)).json()
-    _model = await tf.loadGraphModel(MODEL_PATH)
+    // modelos que são possíveis de serem reconhecidos (por já terem sido configurados)
+    _labels = await (await fetch(LABELS_PATH)).json();
+    // dados do modelo do yolo
+    _model = await tf.loadGraphModel(MODEL_PATH);
 
-    // warmup
-    const dummyInput = tf.ones(_model.inputs[0].shape)
-    await _model.executeAsync(dummyInput)
-    tf.dispose(dummyInput)
+    // warmup (aquecimento do modelo)
+    const dummyInput = tf.ones(_model.inputs[0].shape);
+    // executa o modelo
+    await _model.executeAsync(dummyInput);
+    // limpar o modelo da memória
+    tf.dispose(dummyInput);
 
-    postMessage({ type: 'model-loaded' })
-
+    postMessage({ type: 'model-loaded' });
 }
 
 /**
@@ -33,57 +36,63 @@ async function loadModelAndLabels() {
  *   evitando vazamento de memória.
  */
 function preprocessImage(input) {
+    // assim ele dá o dispose automaticamente
     return tf.tidy(() => {
-        const image = tf.browser.fromPixels(input)
+        // converte o ImageBitmap para tensor (dimensão que precisamos)
+        const image = tf.browser.fromPixels(input);
 
         return tf.image
             .resizeBilinear(image, [INPUT_MODEL_DIMENTIONS, INPUT_MODEL_DIMENTIONS])
             .div(255)
-            .expandDims(0)
+            .expandDims(0);
     })
 }
 
 async function runInference(tensor) {
-    const output = await _model.executeAsync(tensor)
-    tf.dispose(tensor)
-    // Assume que as 3 primeiras saídas são:
-    // caixas (boxes), pontuações (scores) e classes
+    const output = await _model.executeAsync(tensor);
+    tf.dispose(tensor);
 
-    const [boxes, scores, classes] = output.slice(0, 3)
+    //Assume que as 3 primeiras saídas são:
+    // caixas (boxes), pontuações (scores) e classes
+    const [boxes, scores, classes] = output.slice(0, 3);
     const [boxesData, scoresData, classesData] = await Promise.all(
         [
             boxes.data(),
             scores.data(),
             classes.data(),
         ]
-    )
+    );
 
-    output.forEach(t => t.dispose())
+    output.forEach(t => t.dispose());
 
     return {
         boxes: boxesData,
         scores: scoresData,
         classes: classesData
-    }
+    };
 }
-loadModelAndLabels()
 
-self.onmessage = async ({ data }) => {
-    if (data.type !== 'predict') return
-    if (!_model) return
+loadModelAndLabels();
 
-    const input = preprocessImage(data.image)
-    const { width, height } = data.image
+self.onmessage = async({ data }) => {
+  if (data.type !== 'predict') return;
+  if (!_model) return;
 
-    const inferenceResults = await runInference(input)
+  const input = preprocessImage(data.image);
 
-    debugger
-    postMessage({
-        type: 'prediction',
-        x: 400,
-        y: 400,
-        score: 0
-    });
+  const { width, height } = data.image;
+
+  // usando os dados para detectar ou não objetos
+  const inferenceResults = await runInference(input);
+
+  debugger
+
+  postMessage({
+    type: 'prediction',
+    x: 400,
+    y: 400,
+    score: 0
+  });
 
 
 };

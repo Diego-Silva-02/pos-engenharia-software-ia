@@ -5,5 +5,24 @@
   ],
   "env" : {
     "browser": true
-  }
+  },
+  "overrides": [
+    {
+      "files": ["machine-learning/**/*.js"],
+      "rules": {
+        "no-console": "off",
+        "no-debugger": "warn",
+        "no-unused-vars": "warn"
+      }
+    },
+    {
+      "files": ["machine-learning/worker.js"],
+      "env": {
+        "worker": true
+      },
+      "globals": {
+        "tf": "readonly"
+      }
+    }
+  ]
 }

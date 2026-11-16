@@ -20,7 +20,7 @@ class Character extends AnimatedSprite {
       parts.length -= 1;
       const state = parts.join('/').replace(`${spriteId}/`, '');
       const stateObj = _find(states, { name: state });
-      if (!stateObj) continue
+      if (!stateObj) continue;
 
       if (Object.prototype.hasOwnProperty.call(stateObj, 'textures')) {
         stateObj.textures.push(textures[textureKey]);

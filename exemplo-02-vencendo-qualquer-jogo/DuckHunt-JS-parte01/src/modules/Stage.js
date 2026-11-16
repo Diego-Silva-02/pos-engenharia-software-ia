@@ -54,22 +54,22 @@ class Stage extends Container {
    */
   constructor({ textures }) {
     super();
-    this.textures = textures
+    this.textures = textures;
 
     this.locked = false;
     this.interactive = true;
     this.ducks = [];
     this.dog = new Dog({
-      textures: textures,
+      textures,
       downPoint: DOG_POINTS.DOWN,
       upPoint: DOG_POINTS.UP
     });
     this.dog.visible = false;
     this.flashScreen = FLASH_SCREEN;
     this.flashScreen.visible = false;
-    this.hud = new Hud({ textures: textures });
+    this.hud = new Hud({ textures });
     this.aim = new Aim({
-      textures: textures,
+      textures,
       maxX: MAX_X,
       maxY: MAX_Y
     });

@@ -15,9 +15,6 @@ class Aim extends Sprite {
     this.visible = true;
   }
 
-  move(x, y) {
-    this.position.set(x, y);
-  }
   setSize(width, height) {
     this.width = width;
     this.height = height;
