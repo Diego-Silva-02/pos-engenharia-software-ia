@@ -1,0 +1,56 @@
+<output id="output"></output>
+<!-- https://www.jsdelivr.com/package/npm/markdown -->
+<script src="https://cdn.jsdelivr.net/npm/markdown@0.5.0/lib/markdown.min.js"></script>
+
+<script>
+    const output = document.getElementById('output');
+
+    (async () => {
+        /* O "params" abaixo não é mais foi restrito a extensões do Chrome */
+        // const params = await LanguageModel.params();
+        // console.log("Language Model Params:", params);
+
+        // const temperature = params.defaultTemperature
+        // const topK = params.defaultTopK
+
+        // para contornar, vou criar os valores fixados para testes
+        const temperature = 1;
+        const topK = 3;
+
+        const initialPrompts = [
+            {
+                role: 'system',
+                content: `Você é um assistente de IA que responde de forma clara e objetiva.`
+            }
+        ];
+
+        const question = 'Quem inventou o JavaScript?';
+        output.innerHTML = "Gerando resposta...";
+        // aqui ele baixa o modelo na primeira vez de utilização
+        // o LanguageModel vem do objeto window (window.LanguageModel)
+        // Atualmente o código abaixo funciona apenas após baixar o modelo
+        const session = await LanguageModel.create({
+            expectedInputLanguages: ['pt'],
+            temperature,
+            topK,
+            initialPrompts
+        });
+
+        const responseStream = await session.promptStreaming([
+            {
+                role: 'user',
+                content: question
+            }
+        ]);
+
+        output.innerHTML = "";
+        let fullText = "";
+
+        for await (const token of responseStream) {
+            fullText += token;
+            output.innerHTML = markdown.toHTML(fullText);
+
+            // console.log(token)
+        }
+    })();
+</script>
