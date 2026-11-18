@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -17,28 +17,28 @@
                 <div class="param-group">
                     <label for="temperature">Temperature: <span id="temp-value" class="value-display"></span></label>
                     <input type="range" id="temperature" name="temperature" step="0.1">
-                    <div class="param-description">Controla a criatividade das respostas. Valores baixos = mais focado,
-                        valores altos = mais criativo</div>
+                    <div class="param-description">Controls the creativity of the answers. Low values = more focused,
+                        high values = more creative</div>
                 </div>
 
                 <div class="param-group">
                     <label for="topK">Top K: <span id="topk-value" class="value-display"></span></label>
                     <input type="number" id="topK" name="topK">
-                    <div class="param-description">Limita a seleção às K palavras mais prováveis. Valores menores = mais
-                        previsível</div>
+                    <div class="param-description">Limits the selection to the K most likely words. Lower values = more
+                        predictable</div>
                 </div>
             </div>
 
-            <label for="question">Converse com ela:</label>
-            <textarea name="question" id="question" placeholder="Digite sua pergunta aqui..."></textarea>
+            <label for="question">Chat with it:</label>
+            <textarea name="question" id="question" placeholder="Type your question here..."></textarea>
 
-            <button type="submit" id="ask-button">Enviar</button>
+            <button type="submit" id="ask-button">Send</button>
         </form>
 
         <div id="output"></div>
 
         <footer class="copyright">
-            Erick Wendel - Engenharia de Software com IA Aplicada - UNIPDS - <span id="year"></span>
+            Antonio Diego da Silva - Studying Software Engineering with Applied AI - UNIPDS - <span id="year"></span>
         </footer>
     </div>
 

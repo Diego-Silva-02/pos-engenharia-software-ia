@@ -5,6 +5,23 @@ const aiContext = {
     isGenerating: false,
 };
 
+// The Prompt API only accepts a few languages (en, es, ja, de, fr), so we use English.
+// The same options must be used in availability() and in create().
+const LANGUAGE = 'en';
+const languageOptions = {
+    expectedInputs: [{ type: 'text', languages: [LANGUAGE] }],
+    expectedOutputs: [{ type: 'text', languages: [LANGUAGE] }],
+};
+
+// LanguageModel.params() is not exposed to web pages anymore (only to Chrome extensions).
+// These are the values documented by Chrome, used when params() is not available.
+const FALLBACK_PARAMS = {
+    defaultTemperature: 1,
+    defaultTopK: 3,
+    maxTemperature: 2,
+    maxTopK: 128,
+};
+
 const elements = {
     temperature: document.getElementById('temperature'),
     temperatureValue: document.getElementById('temp-value'),
@@ -52,37 +69,48 @@ async function onSubmitQuestion() {
     // Get parameters from form
     const temperature = parseFloat(elements.temperature.value);
     const topK = parseInt(elements.topK.value);
-    console.log('Using parameters:', { temperature, topK });
+    // console.log('Using parameters:', { temperature, topK });
 
     // Change button to stop mode
     toggleSendOrStopButton(true)
 
-    output.textContent = 'Processing your question...';
-    const aiResponseChunks = await askAI(question, temperature, topK);
-    output.textContent = '';
+    try {
+        output.textContent = 'Processing your question...';
+        // The model is downloaded here, if needed. This runs inside the click
+        // on "Send", which is the user gesture Chrome requires to start the download.
+        const aiResponseChunks = askAI(question, temperature, topK);
+        let isFirstChunk = true;
 
-    for await (const chunk of aiResponseChunks) {
-        if (aiContext.abortController.signal.aborted) {
-            break;
+        for await (const chunk of aiResponseChunks) {
+            if (aiContext.abortController.signal.aborted) {
+                break;
+            }
+            if (isFirstChunk) {
+                output.textContent = '';
+                isFirstChunk = false;
+            }
+            // console.log('Received chunk:', chunk);
+            output.textContent += chunk;
         }
-        console.log('Received chunk:', chunk);
-        output.textContent += chunk;
+    } catch (error) {
+        console.error('Error while asking the AI:', error);
+        output.textContent = `⚠️ Error (${error.name}): ${error.message}`;
+    } finally {
+        toggleSendOrStopButton(false);
     }
-
-   toggleSendOrStopButton(false);
 }
 
 function toggleSendOrStopButton(isGenerating) {
     if (isGenerating) {
         // Switch to stop mode
         aiContext.isGenerating = isGenerating;
-        elements.button.textContent = 'Parar';
+        elements.button.textContent = 'Stop';
         elements.button.classList.add('stop-button');
     } else {
         // Switch to send mode
         aiContext.abortController?.abort();
         aiContext.isGenerating = isGenerating;
-        elements.button.textContent = 'Enviar';
+        elements.button.textContent = 'Send';
         elements.button.classList.remove('stop-button');
     }
 }
@@ -93,21 +121,31 @@ async function* askAI(question, temperature, topK) {
     // Destroy previous session and create new one with updated parameters
     if (aiContext.session) {
         aiContext.session.destroy();
+        aiContext.session = null;
     }
 
+    // create() downloads the model on the first use (it may take a few minutes)
     const session = await LanguageModel.create({
-        expectedInputLanguages: ["pt"],
+        ...languageOptions,
         temperature: temperature,
         topK: topK,
         initialPrompts: [
             {
                 role: 'system', content: `
-                Você é um assistente de IA que responde de forma clara e objetiva.
-                Responda sempre em formato de texto ao invés de markdown`
+                You are an AI assistant that answers clearly and objectively.
+                Always answer in plain text instead of markdown`
 
             },
         ],
+        monitor(m) {
+            m.addEventListener('downloadprogress', (e) => {
+                const percent = ((e.loaded / (e.total || 1)) * 100).toFixed(0);
+                // console.log(`Downloaded ${percent}%`);
+                elements.output.textContent = `Downloading the AI model... ${percent}%`;
+            });
+        },
     });
+    aiContext.session = session;
 
     const responseStream = await session.promptStreaming(
         [
@@ -129,6 +167,8 @@ async function* askAI(question, temperature, topK) {
     }
 }
 
+// Only checks if the browser supports the API. It does NOT download anything:
+// the download happens when the user clicks "Send".
 async function checkRequirements() {
     const errors = [];
     const returnResults = () => errors.length ? errors : null;
@@ -136,57 +176,49 @@ async function checkRequirements() {
     // @ts-ignore
     const isChrome = !!window.chrome;
     if (!isChrome)
-        errors.push("⚠️ Este recurso só funciona no Google Chrome ou Chrome Canary (versão recente).");
+        errors.push("⚠️ This feature only works in Google Chrome or Chrome Canary (recent version).");
     if (!('LanguageModel' in self)) {
-        errors.push("⚠️ As APIs nativas de IA não estão ativas.");
-        errors.push("Ative a seguinte flag em chrome://flags/:");
+        errors.push("⚠️ The native AI APIs are not enabled.");
+        errors.push("Enable the following flag in chrome://flags/:");
         errors.push("- Prompt API for Gemini Nano (chrome://flags/#prompt-api-for-gemini-nano)");
-        errors.push("Depois reinicie o Chrome e tente novamente.");
+        errors.push("Then restart Chrome and try again.");
         return returnResults();
     }
 
-    const availability = await LanguageModel.availability({ languages: ["pt"] });
-    console.log('Language Model Availability:', availability);
-    if (availability === 'available') {
-        return returnResults();
-    }
+    const availability = await LanguageModel.availability(languageOptions);
+    // console.log('Language Model Availability:', availability);
 
     if (availability === 'unavailable') {
-        errors.push(`⚠️ O seu dispositivo não suporta modelos de linguagem nativos de IA.`);
-    }
-
-    if (availability === 'downloading') {
-        errors.push(`⚠️ O modelo de linguagem de IA está sendo baixado. Por favor, aguarde alguns minutos e tente novamente.`);
-    }
-
-    if (availability === 'downloadable') {
-        errors.push(`⚠️ O modelo de linguagem de IA precisa ser baixado, baixando agora... (acompanhe o progresso no terminal do chrome)`);
-        try {
-            const session = await LanguageModel.create({
-                expectedInputLanguages: ["pt"],
-                monitor(m) {
-                    m.addEventListener('downloadprogress', (e) => {
-                        const percent = ((e.loaded / e.total) * 100).toFixed(0);
-                        console.log(`Downloaded ${percent}%`);
-                    });
-                }
-            });
-            await session.prompt('Olá');
-            session.destroy();
-
-            // Re-check availability after download
-            const newAvailability = await LanguageModel.availability({ languages: ["pt"] });
-            if (newAvailability === 'available') {
-                return null; // Download successful
-            }
-        } catch (error) {
-            console.error('Error downloading model:', error);
-            errors.push(`⚠️ Erro ao baixar o modelo: ${error.message}`);
-        }
+        errors.push(`⚠️ Your device does not support native AI language models (or the language "${LANGUAGE}" is not supported).`);
     }
 
     return returnResults();
+}
 
+async function getModelParams() {
+    try {
+        if (typeof LanguageModel.params === 'function') {
+            const params = await LanguageModel.params();
+            if (params) {
+                return params;
+            }
+        }
+    } catch (error) {
+        console.warn('LanguageModel.params() failed:', error);
+    }
+
+    console.warn('LanguageModel.params() is not available here. Using the documented default values.');
+    return FALLBACK_PARAMS;
+}
+
+async function showModelStatus() {
+    const availability = await LanguageModel.availability(languageOptions);
+
+    if (availability === 'downloadable' || availability === 'downloading') {
+        elements.output.textContent =
+            'ℹ️ The AI model has not been downloaded yet. ' +
+            'Type a question and click "Send": the model will be downloaded first (it can take a few minutes).';
+    }
 }
 
 (async function main() {
@@ -199,7 +231,7 @@ async function checkRequirements() {
         return;
     }
 
-    const params = await LanguageModel.params();
+    const params = await getModelParams();
     console.log('Language Model Params:', params);
     /*
     defaultTemperature: 1
@@ -217,6 +249,8 @@ async function checkRequirements() {
     elements.temperature.max = params.maxTemperature;
     elements.temperature.min = 0;
     elements.temperature.value = params.defaultTemperature;
+
+    await showModelStatus();
     return setupEventListeners()
 })();
 
