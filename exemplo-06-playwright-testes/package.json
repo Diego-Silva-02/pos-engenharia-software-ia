@@ -1,0 +1,17 @@
+{
+  "name": "exemplo-06-playwright-testes",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright tests for https://erickwendel.github.io/vanilla-js-web-app-example/",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "demo": "playwright test -c playwright.demo.config.ts",
+    "report": "playwright show-report"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^26.6.6"
+  }
+}

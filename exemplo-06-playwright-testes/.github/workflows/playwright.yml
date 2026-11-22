@@ -1,0 +1,51 @@
+name: Playwright Tests (exemplo-06)
+
+on:
+  push:
+    paths:
+      - 'exemplo-06-playwright-testes/**'
+      - '.github/workflows/playwright.yml'
+  pull_request:
+    paths:
+      - 'exemplo-06-playwright-testes/**'
+      - '.github/workflows/playwright.yml'
+  workflow_dispatch:
+
+# The project lives in a subfolder of the repository
+defaults:
+  run:
+    working-directory: exemplo-06-playwright-testes
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: exemplo-06-playwright-testes/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium only
+        run: npx playwright install --with-deps chromium
+
+      - name: Run tests
+        run: npm test
+
+      - name: Upload the HTML report (only on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          # "working-directory" does not apply to "uses" steps, so the full path is needed
+          path: exemplo-06-playwright-testes/playwright-report/
+          retention-days: 7

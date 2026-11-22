@@ -1,0 +1,26 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e5]:
+    - generic [ref=e7]:
+      - generic "Image Title Icon" [ref=e8]: 💥
+      - generic [ref=e9]: Image Title
+      - textbox "Image Title" [ref=e10]
+    - generic [ref=e12]:
+      - generic "Image URL Icon" [ref=e13]: 📸
+      - generic [ref=e14]: Image URL
+      - textbox "Image URL" [ref=e15]:
+        - /placeholder: https://img.com/erick.png
+    - button "Submit Form" [ref=e17] [cursor=pointer]
+  - main [ref=e18]:
+    - generic [ref=e19]:
+      - article [ref=e20]:
+        - figure "AI Alien" [ref=e22]:
+          - img "Image of an AI Alien" [ref=e23]
+          - heading "AI Alien" [level=4] [ref=e25]
+      - article [ref=e26]:
+        - figure "Predator Night Vision" [ref=e28]:
+          - img "Image of Predator Night Vision" [ref=e29]
+          - heading "Predator Night Vision" [level=4] [ref=e31]
+      - article [ref=e32]:
+        - figure "ET Bilu" [ref=e34]:
+          - img "Image of ET Bilu" [ref=e35]
+          - heading "ET Bilu" [level=4] [ref=e37]
